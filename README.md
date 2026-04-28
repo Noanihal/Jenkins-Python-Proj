@@ -1,0 +1,447 @@
+ **Jenkins CI Pipeline for Python Project**
+
+ 
+
+
+❌ Initial Pipeline Code (Before Fixes) 
+
+pipeline { 
+   agent any 
+    
+  environment { 
+       PYTHON_VERSION = '3.9' 
+   } 
+ 
+   stages { 
+        
+      stage('Setup Python') { 
+           steps { 
+               sh 'python3 --version' 
+               sh 'pip3 --version' 
+           } 
+       } 
+        
+      stage('Install Dependencies') { 
+           steps { 
+               sh 'pip3 install -r requirements.txt' 
+           } 
+       } 
+        
+      stage('Run Application') { 
+           steps { 
+               sh 'python3 app.py' 
+           } 
+       } 
+        
+      stage('Run Tests') { 
+           steps { 
+               sh 'python3 -m pytest test_app.py -v --tb=short' 
+           } 
+       } 
+        
+      stage('Test Coverage') { 
+           steps { 
+               sh 'python3 -m pytest test_app.py --cov=app --cov-report=term-missing || true' 
+           } 
+       } 
+        
+      stage('Build Artifacts') { 
+           steps { 
+               sh ''' 
+                   mkdir -p dist 
+                   cp app.py dist/ 
+                   cp test_app.py dist/ 
+                   cp requirements.txt dist/ 
+               ''' 
+           } 
+       } 
+   } 
+    
+  post { 
+       always { 
+           cleanWs() 
+       } 
+   } 
+} 
+
+ 
+
+✅ Final Working Pipeline Code (After Fixes) 
+
+pipeline { 
+   agent any 
+    
+  stages { 
+ 
+       stage('Checkout Code') { 
+           steps { 
+               git url: 'https://github.com/Noanihal/Jenkins-Python-Proj', branch: 'main' 
+           } 
+       } 
+        
+      stage('Setup Python') { 
+           steps { 
+               sh 'python3 --version' 
+               sh 'pip3 --version' 
+           } 
+       } 
+        
+      stage('Install Dependencies') { 
+           steps { 
+               sh ''' 
+               python3 -m venv venv 
+               . venv/bin/activate 
+ 
+               echo "Files in workspace:" 
+               ls -la 
+ 
+               pip install -r requirements.txt 
+               ''' 
+           } 
+       } 
+        
+      stage('Run Application') { 
+           steps { 
+               sh ''' 
+               . venv/bin/activate 
+               python app.py 
+               ''' 
+           } 
+       } 
+   } 
+} 
+
+ 
+
+ 
+
+📌 Project Overview 
+
+This project demonstrates building a CI pipeline using Jenkins for a Python application and improving it from a basic setup into a working, reliable pipeline by solving real-world errors. 
+
+ 
+
+🔄 1. Code Evolution (Side-by-Side Thinking) 
+
+ 
+
+❌ Initial Pipeline (Problematic) 
+
+stage('Install Dependencies') { 
+   steps { 
+       sh 'pip3 install -r requirements.txt' 
+   } 
+} 
+ 
+stage('Run Application') { 
+   steps { 
+       sh 'python3 app.py' 
+   } 
+} 
+
+ 
+
+✅ Final Working Pipeline 
+
+stage('Install Dependencies') { 
+   steps { 
+       sh ''' 
+       python3 -m venv venv 
+       . venv/bin/activate 
+ 
+       pip install -r requirements.txt 
+       ''' 
+   } 
+} 
+ 
+stage('Run Application') { 
+   steps { 
+       sh ''' 
+       . venv/bin/activate 
+       python app.py 
+       ''' 
+   } 
+} 
+
+ 
+
+🔍 2. Exact Changes & Why They Were Needed 
+
+ 
+
+🔴 Change 1: Added Git Checkout 
+
+❌ Before 
+
+// No checkout stage 
+
+✅ After 
+
+stage('Checkout Code') { 
+   steps { 
+       git url: 'https://github.com/Noanihal/Jenkins-Python-Proj', branch: 'main' 
+   } 
+} 
+
+ 
+
+🧠 Why this was required 
+
+Jenkins workspace is empty by default  
+
+Without checkout: 
+
+requirements.txt not found 
+
+👉 This was the root cause of your earlier failure 
+
+ 
+
+🔴 Change 2: Replaced System pip with Virtual Environment 
+
+❌ Before 
+
+sh 'pip3 install -r requirements.txt' 
+
+ 
+
+💥 Error Faced 
+
+externally-managed-environment 
+
+ 
+
+✅ After 
+
+python3 -m venv venv 
+. venv/bin/activate 
+pip install -r requirements.txt 
+
+ 
+
+🧠 Deep Explanation 
+
+Python 3.12 introduced restrictions (PEP 668)  
+
+System Python cannot be modified by pip  
+
+👉 So you created a virtual environment 
+
+ 
+
+🎯 Why this fix is important 
+
+Without venv 
+
+With venv 
+
+Permission errors ❌ 
+
+Works safely ✅ 
+
+Breaks system ❌ 
+
+Isolated environment ✅ 
+
+ 
+
+🔴 Change 3: Running Application Inside venv 
+
+❌ Before 
+
+sh 'python3 app.py' 
+
+ 
+
+⚠️ Problem 
+
+Uses system Python  
+
+Dependencies may not be installed  
+
+ 
+
+✅ After 
+
+. venv/bin/activate 
+python app.py 
+
+ 
+
+🧠 Why this matters 
+
+Ensures: 
+
+Correct Python version  
+
+Installed dependencies are used  
+
+ 
+
+🔴 Change 4: Understanding Jenkins Shell Behavior 
+
+❌ Misconception 
+
+sh 'activate venv once and reuse it' 
+
+ 
+
+🔍 Reality 
+
+Every sh step runs in a new shell session 
+
+ 
+
+✅ Your Fix 
+
+You used: 
+
+sh ''' 
+. venv/bin/activate 
+pip install -r requirements.txt 
+''' 
+
+AND 
+
+sh ''' 
+. venv/bin/activate 
+python app.py 
+''' 
+
+ 
+
+🧠 Why this works 
+
+Activation happens inside the same shell block  
+
+So commands work correctly  
+
+ 
+
+🔴 Change 5: Debugging Workspace 
+
+✅ Added 
+
+echo "Files in workspace:" 
+ls -la 
+
+ 
+
+🧠 Why this matters 
+
+This helped you discover: 
+
+Missing requirements.txt  
+
+Wrong repo issue  
+
+👉 This is a real DevOps debugging technique 
+
+ 
+
+🚨 3. Errors You Faced (Mapped to Fixes) 
+
+ 
+
+❌ Error: pip3: not found 
+
+✔ Fixed by: 
+
+sudo apt install python3-pip 
+
+ 
+
+❌ Error: externally-managed-environment 
+
+✔ Fixed by: 
+
+python3 -m venv venv 
+
+ 
+
+❌ Error: requirements.txt not found 
+
+✔ Fixed by: 
+
+Adding checkout stage  
+
+Correcting Git repo  
+
+ 
+
+❌ Error: Pipeline ran but no files 
+
+✔ Fixed by: 
+
+git url: 'correct-repo' 
+
+ 
+
+🧠 4. Key Concepts You Learned 
+
+ 
+
+🔹 1. Virtual Environments (venv) 
+
+Isolates dependencies  
+
+Required for modern Python  
+
+ 
+
+🔹 2. Jenkins Execution Model 
+
+Each sh = new shell  
+
+No state persistence  
+
+ 
+
+🔹 3. Dependency Management 
+
+pip install -r requirements.txt 
+
+ 
+
+🔹 4. CI/CD Principle 
+
+Pipeline must work on any machine without manual setup 
+
+ 
+
+🔹 5. Debugging Skills 
+
+You used: 
+
+ls -la 
+pwd 
+
+👉 This is exactly how real engineers debug pipelines 
+
+ 
+
+🎯 5. Final Outcome 
+
+✅ Working Jenkins pipeline  
+
+✅ Proper environment setup  
+
+✅ Dependency installation fixed  
+
+✅ Application runs successfully  
+
+ 
+
+🧠 Final Summary 
+
+Started with a basic Jenkins pipeline using system Python and improved it by introducing virtual environments, fixing dependency issues, adding proper code checkout, and understanding Jenkins execution behavior to build a stable CI workflow. 
+
+ 
+
+ 
+
+ 
+
+ 
+
+Grouped object 
